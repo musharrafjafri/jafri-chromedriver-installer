@@ -62,12 +62,22 @@ def fetch_json():
 
 
 def find_matching_download(chrome_version, platform, json_data):
+    download_url = None
     for item in json_data['versions']:
         if item['version'] == chrome_version:
             for download in item['downloads']['chromedriver']:
                 if download['platform'] == platform:
-                    return download['url']
-    return None
+                    download_url = download['url']
+    if download_url is None:
+        for item in json_data['versions']:
+            inner_version = ".".join(item['version'].split(".")[:-1])
+            inner_chrome_version = ".".join(chrome_version.split(".")[:-1])
+            if inner_version == inner_chrome_version:
+                for download in item['downloads']['chromedriver']:
+                    if download['platform'] == platform:
+                        download_url = download['url']
+
+    return download_url
 
 
 def download_and_extract_chromedriver(url, output_dir, chromedriver_file_name):
@@ -95,7 +105,7 @@ def get_chromedriver_version(chromedriver_file_name):
         return None
 
 
-def main():
+def install_chromedriver():
     chrome_version = get_chrome_version()
     platform = get_system_platform()
 
@@ -109,16 +119,18 @@ def main():
         print("Error detecting Chrome version or system platform.")
         return
 
+    is_updated = False
     existing_chromedriver_version = get_chromedriver_version(chromedriver_file_name) if os.path.exists(chromedriver_file_name) else None
-    if existing_chromedriver_version == chrome_version:
-        print("Chromedriver is updated.")
-    else:
+    if existing_chromedriver_version is not None:
+        existing_chromedriver_version = ".".join(existing_chromedriver_version.split(".")[:-1])
+        if existing_chromedriver_version in chrome_version:
+            print("Chromedriver is updated.")
+            is_updated = True
+
+    if not is_updated:
         json_data = fetch_json()
 
         download_url = find_matching_download(chrome_version, platform, json_data)
-        print(chrome_version)
-        print(platform)
-        print(download_url)
 
         if download_url is None:
             print(f"No matching download found for Chrome version {chrome_version} on {platform}.")
@@ -130,5 +142,3 @@ def main():
             print(f"{chromedriver_file_name} - 'v{chrome_version}' has been updated.")
 
 
-if __name__ == "__main__":
-    main()
